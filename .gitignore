@@ -1,0 +1,7 @@
+snapshot/
+*.so
+*.zip
+data/
+weights/
+__pycache__/
+build/
