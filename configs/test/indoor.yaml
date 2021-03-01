@@ -3,32 +3,21 @@ misc:
   mode: test
   gpu_mode: True
   verbose: True
-  verbose_freq: 1000
+  verbose_freq: 500
   snapshot_freq: 1
-  pretrain: 'weights/indoor_predator.pth'
+  pretrain: 'snapshot/indoor/checkpoints/model_best_loss.pth'
 
 
 model:
-  num_layers: 4 
-  in_points_dim: 3
-  first_feats_dim: 128
-  final_feats_dim: 32
-  first_subsampling_dl: 0.025
+  model: ResUNetBN2C
   in_feats_dim: 1
-  conv_radius: 2.5
-  deform_radius: 5.0 
-  num_kernel_points: 15
-  KP_extent: 2.0
-  KP_influence: linear
-  aggregation_mode: sum 
-  fixed_kernel_points: center
-  use_batch_norm: True 
-  batch_norm_momentum: 0.02
-  deformable: False
-  modulated: False 
+  out_feats_dim: 32
+  conv1_kernel_size: 5
+  normalize_feature: True
+  dist_type: L2
 
 overlap_attention_module:
-  gnn_feats_dim: 256 
+  gnn_feats_dim: 256
   dgcnn_k: 10
   num_head: 4
   nets: ['self','cross','self']
@@ -48,19 +37,21 @@ loss:
 
 optimiser:
   optimizer: SGD
-  max_epoch: 40
-  lr: 0.005
-  weight_decay: 0.000001
-  momentum: 0.98
+  max_epoch: 100
+  lr: 0.1
+  momentum: 0.8
+  weight_decay: 0.0001
+  bn_momentum: 0.05
   scheduler: ExpLR
-  scheduler_gamma: 0.95
+  scheduler_gamma: 0.99
   scheduler_freq: 1
-  iter_size: 1
+  iter_size: 4
 
 dataset:
   dataset: indoor
   benchmark: 3DMatch
   root: data/indoor
+  voxel_size: 0.025
   batch_size: 1 
   num_workers: 6 
   augment_noise: 0.005
