@@ -2,10 +2,11 @@ import MinkowskiEngine as ME
 import torch
 from lib.utils import load_obj
 from datasets.indoor import IndoorDataset
+from datasets.kitti import KITTIDataset
 
 
 def collate_pair_fn(list_data):
-    src_xyz, tgt_xyz, src_coords, tgt_coords, src_feats, tgt_feats, matching_inds, rot, trans = list(zip(*list_data))
+    src_xyz, tgt_xyz, src_coords, tgt_coords, src_feats, tgt_feats, matching_inds, rot, trans, scale = list(zip(*list_data))
 
     # prepare inputs for FCGF
     src_batch_C, src_batch_F = ME.utils.sparse_collate(src_coords, src_feats)
@@ -40,7 +41,8 @@ def collate_pair_fn(list_data):
         'correspondences': matching_inds_batch,
         'len_batch': len_batch,
         'rot': rot[0],
-        'trans': trans[0]
+        'trans': trans[0],
+        'scale': scale[0]
     }
 
 
@@ -54,6 +56,10 @@ def get_datasets(config):
         train_set = IndoorDataset(info_train,config,data_augmentation=True)
         val_set = IndoorDataset(info_val,config,data_augmentation=False)
         benchmark_set = IndoorDataset(info_benchmark,config, data_augmentation=False)
+    elif(config.dataset == 'kitti'):
+        train_set = KITTIDataset(config,'train',data_augmentation=True)
+        val_set = KITTIDataset(config,'val',data_augmentation=False)
+        benchmark_set = KITTIDataset(config, 'test',data_augmentation=False)
     else:
         raise NotImplementedError
 

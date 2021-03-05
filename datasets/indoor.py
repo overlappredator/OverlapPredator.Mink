@@ -24,11 +24,10 @@ class IndoorDataset(Dataset):
         super(IndoorDataset,self).__init__()
         self.infos = infos
         self.base_dir = config.root
-        self.overlap_radius = config.overlap_radius
         self.data_augmentation=data_augmentation
         self.config = config
         self.voxel_size = config.voxel_size
-        self.search_voxel_size = self.voxel_size * 1.5
+        self.search_voxel_size = config.overlap_radius
         
         self.rot_factor=1.
         self.augment_noise = config.augment_noise
@@ -84,5 +83,6 @@ class IndoorDataset(Dataset):
 
         src_xyz, tgt_xyz = to_tensor(src_xyz).float(), to_tensor(tgt_xyz).float()
         rot, trans = to_tensor(rot), to_tensor(trans)
+        scale = 1
 
-        return src_xyz, tgt_xyz, src_coords, tgt_coords, src_feats, tgt_feats, matching_inds, rot, trans
+        return src_xyz, tgt_xyz, src_coords, tgt_coords, src_feats, tgt_feats, matching_inds, rot, trans, scale

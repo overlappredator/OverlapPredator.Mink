@@ -4,6 +4,7 @@ from tqdm import tqdm
 import numpy as np
 from lib.benchmark_utils import ransac_pose_estimation, random_sample, get_angle_deviation, to_o3d_pcd, to_array
 import open3d as o3d
+import MinkowskiEngine as ME
 
 # Modelnet part
 from common.math_torch import se3
@@ -28,31 +29,28 @@ class IndoorTester(Trainer):
         self.model.eval()
         with torch.no_grad():
             for idx in tqdm(range(num_iter)): # loop through this epoch
-                inputs = c_loader_iter.next()
-                ##################################
-                # load inputs to device.
-                for k, v in inputs.items():  
-                    if type(v) == list:
-                        inputs[k] = [item.to(self.device) for item in v]
-                    else:
-                        inputs[k] = v.to(self.device)
-                ###############################################
-                # forward pass
-                feats, scores_overlap, scores_saliency = self.model(inputs)  #[N1, C1], [N2, C2]
-                pcd = inputs['points'][0]
-                len_src = inputs['stack_lengths'][0][0]
-                c_rot, c_trans = inputs['rot'], inputs['trans']
-                correspondence = inputs['correspondences']
+                input_dict = c_loader_iter.next()
 
-                src_pcd, tgt_pcd = pcd[:len_src], pcd[len_src:]
-                src_feats, tgt_feats = feats[:len_src], feats[len_src:]
+                # forward pass
+                sinput_src = ME.SparseTensor(
+                    input_dict['src_F'].to(self.device),
+                    coordinates=input_dict['src_C'].to(self.device))
+                sinput_tgt = ME.SparseTensor(
+                    input_dict['tgt_F'].to(self.device),
+                    coordinates=input_dict['tgt_C'].to(self.device))
+                
+                src_feats, tgt_feats, scores_overlap, scores_saliency= self.model(sinput_src, sinput_tgt)
+                src_pcd, tgt_pcd = input_dict['pcd_src'].to(self.device), input_dict['pcd_tgt'].to(self.device)
+                c_rot = input_dict['rot'].to(self.device)
+                c_trans = input_dict['trans'].to(self.device)
+                correspondence = input_dict['correspondences'].long().to(self.device)
 
                 data = dict()
-                data['pcd'] = pcd.cpu()
-                data['feats'] = feats.detach().cpu()
+                data['pcd'] = torch.cat([src_pcd, tgt_pcd],dim=0).cpu()
+                data['feats'] = torch.cat([src_feats, tgt_feats],dim=0).cpu()
                 data['overlaps'] = scores_overlap.detach().cpu()
                 data['saliency'] = scores_saliency.detach().cpu()
-                data['len_src'] = len_src
+                data['len_src'] = src_pcd.size(0)
                 data['rot'] = c_rot.cpu()
                 data['trans'] = c_trans.cpu()
 

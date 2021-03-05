@@ -30,12 +30,12 @@ class MetricLoss(nn.Module):
         self.matchability_radius = configs.matchability_radius
         self.pos_radius = configs.pos_radius # just to take care of the numeric precision
     
-    def get_circle_loss(self, coords_dist, feats_dist):
+    def get_circle_loss(self, coords_dist, feats_dist, scale):
         """
         Modified from: https://github.com/XuyangBai/D3Feat.pytorch
         """
-        pos_mask = coords_dist < self.pos_radius 
-        neg_mask = coords_dist > self.safe_radius 
+        pos_mask = coords_dist < self.pos_radius * scale
+        neg_mask = coords_dist > self.safe_radius * scale
 
         ## get anchors that have both positive and negative pairs
         row_sel = ((pos_mask.sum(-1)>0) * (neg_mask.sum(-1)>0)).detach()
@@ -63,15 +63,15 @@ class MetricLoss(nn.Module):
 
         return circle_loss
 
-    def get_recall(self,coords_dist,feats_dist):
+    def get_recall(self,coords_dist,feats_dist, scale):
         """
         Get feature match recall, divided by number of true inliers
         """
-        pos_mask = coords_dist < self.pos_radius
+        pos_mask = coords_dist < self.pos_radius * scale
         n_gt_pos = (pos_mask.sum(-1)>0).float().sum()+1e-12
         _, sel_idx = torch.min(feats_dist, -1)
         sel_dist = torch.gather(coords_dist,dim=-1,index=sel_idx[:,None])[pos_mask.sum(-1)>0]
-        n_pred_pos = (sel_dist < self.pos_radius).float().sum()
+        n_pred_pos = (sel_dist < self.pos_radius * scale).float().sum()
         recall = n_pred_pos / n_gt_pos
         return recall
 
@@ -96,7 +96,7 @@ class MetricLoss(nn.Module):
         return w_class_loss, cls_precision, cls_recall
             
 
-    def forward(self, src_pcd, tgt_pcd, src_feats, tgt_feats, correspondence, rot, trans,scores_overlap,scores_saliency):
+    def forward(self, src_pcd, tgt_pcd, src_feats, tgt_feats, correspondence, rot, trans,scores_overlap,scores_saliency, scale):
         """
         Circle loss for metric learning, here we feed the positive pairs only
         Input:
@@ -136,7 +136,7 @@ class MetricLoss(nn.Module):
         _, idx = scores.max(0)
         distance_2 = torch.norm(tgt_pcd_sel - src_pcd_sel[idx], p=2, dim=1)
 
-        gt_labels = torch.cat(((distance_1<self.matchability_radius).float(), (distance_2<self.matchability_radius).float()))
+        gt_labels = torch.cat(((distance_1<self.matchability_radius * scale).float(), (distance_2<self.matchability_radius * scale).float()))
 
         src_saliency_scores = scores_saliency[:src_pcd.size(0)][src_idx]
         tgt_saliency_scores = scores_saliency[src_pcd.size(0):][tgt_idx]
@@ -150,7 +150,7 @@ class MetricLoss(nn.Module):
         #######################################
         # filter some of correspondence as we are using different radius for "overlap" and "correspondence"
         c_dist = torch.norm(src_pcd[correspondence[:,0]] - tgt_pcd[correspondence[:,1]], dim = 1)
-        c_select = c_dist < self.pos_radius - 0.001
+        c_select = c_dist < self.pos_radius * scale - 0.001
         correspondence = correspondence[c_select]
         if(correspondence.size(0) > self.max_points):
             choice = np.random.permutation(correspondence.size(0))[:self.max_points]
@@ -168,8 +168,8 @@ class MetricLoss(nn.Module):
         ##############################
         # get FMR and circle loss
         ##############################
-        recall = self.get_recall(coords_dist, feats_dist)
-        circle_loss = self.get_circle_loss(coords_dist, feats_dist)
+        recall = self.get_recall(coords_dist, feats_dist, scale)
+        circle_loss = self.get_circle_loss(coords_dist, feats_dist, scale)
 
         stats['circle_loss']= circle_loss
         stats['recall']=recall

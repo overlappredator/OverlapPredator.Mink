@@ -135,7 +135,7 @@ class Trainer(object):
 
             ###################################################
             # get loss
-            stats= self.desc_loss(src_pcd, tgt_pcd, src_feats, tgt_feats,correspondence, c_rot, c_trans, scores_overlap, scores_saliency)
+            stats= self.desc_loss(src_pcd, tgt_pcd, src_feats, tgt_feats,correspondence, c_rot, c_trans, scores_overlap, scores_saliency,input_dict['scale'])
 
             c_loss = stats['circle_loss'] * self.w_circle_loss + stats['overlap_loss'] * self.w_overlap_loss + stats['saliency_loss'] * self.w_saliency_loss
 
@@ -161,7 +161,7 @@ class Trainer(object):
 
                 ###################################################
                 # get loss
-                stats= self.desc_loss(src_pcd, tgt_pcd, src_feats, tgt_feats,correspondence, c_rot, c_trans, scores_overlap, scores_saliency)
+                stats= self.desc_loss(src_pcd, tgt_pcd, src_feats, tgt_feats,correspondence, c_rot, c_trans, scores_overlap, scores_saliency,input_dict['scale'])
 
 
         ##################################        
@@ -206,8 +206,8 @@ class Trainer(object):
                 # update to stats_meter
                 for key,value in stats.items():
                     stats_meter[key].update(value)
-            except Exception as inst:
-                print(inst)
+            except RuntimeError as inst:
+                pass
             
             torch.cuda.empty_cache()
             

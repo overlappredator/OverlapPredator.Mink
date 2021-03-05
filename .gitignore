@@ -5,3 +5,5 @@ data/
 weights/
 __pycache__/
 build/
+est_traj/
+scripts.py

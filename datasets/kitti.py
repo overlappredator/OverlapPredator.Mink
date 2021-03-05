@@ -3,17 +3,17 @@ import os, time, glob, random, pickle, copy, torch
 import numpy as np
 import open3d
 from scipy.spatial.transform import Rotation
+import MinkowskiEngine as ME
 
 # Dataset parent class
 from torch.utils.data import Dataset
-from lib.benchmark_utils import to_tsfm, to_o3d_pcd, get_correspondences
+from lib.benchmark_utils import to_tsfm, to_o3d_pcd, get_correspondences, to_tensor
 
 
 class KITTIDataset(Dataset):
     """
-    We follow D3Feat to add data augmentation part.
-    We first voxelize the pcd and get matches
-    Then we apply data augmentation to pcds. KPConv runs over processed pcds, but later for loss computation, we use pcds before data augmentation
+    We augment data with rotation, scaling, and translation
+    Then we get correspondence, and voxelise them, 
     """
     DATA_FILES = {
         'train': './configs/kitti/train_kitti.txt',
@@ -27,12 +27,11 @@ class KITTIDataset(Dataset):
         self.icp_path = os.path.join(config.root,'icp')
         if not os.path.exists(self.icp_path):
             os.makedirs(self.icp_path)
-        self.voxel_size = config.first_subsampling_dl
-        self.matching_search_voxel_size = config.overlap_radius
+        self.voxel_size = config.voxel_size
+        self.search_voxel_size = config.overlap_radius
         self.data_augmentation = data_augmentation
         self.augment_noise = config.augment_noise
         self.IS_ODOMETRY = True
-        self.max_corr = config.max_points
         self.augment_shift_range = config.augment_shift_range
         self.augment_scale_max = config.augment_scale_max
         self.augment_scale_min = config.augment_scale_min
@@ -82,22 +81,6 @@ class KITTIDataset(Dataset):
             self.files.remove((8, 15, 58))
         print(f'Num_{split}: {len(self.files)}')
 
-            # #######################################
-            # # Predator script to generate test pairs
-            # # use minimum and maximum to threshold the pairs
-            # thresholding = (pdist > self.min_dist) & (pdist < self.max_dist)
-
-            # curr_time = inames[0]
-            # while curr_time in inames: # we consider every 4 frames that fullfill our thresholding
-            #     next_times = np.where(thresholding[curr_time][curr_time:curr_time + 100])[0].tolist()
-            #     if len(next_times) == 0:
-            #         curr_time += 1
-            #     else:
-            #         next_time = next_times[0] + curr_time - 1
-            #         if next_time in inames:
-            #             self.files.append((drive_id, curr_time, next_time))
-            #             curr_time = next_time + 1
-
 
 
     def __len__(self):
@@ -112,12 +95,9 @@ class KITTIDataset(Dataset):
         fname0 = self._get_velodyne_fn(drive, t0)
         fname1 = self._get_velodyne_fn(drive, t1)
 
-        # XYZ and reflectance
-        xyzr0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)
-        xyzr1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)
-
-        xyz0 = xyzr0[:, :3]
-        xyz1 = xyzr1[:, :3]
+        # extract xyz
+        xyz0 = np.fromfile(fname0, dtype=np.float32).reshape(-1, 4)[:,:3]
+        xyz1 = np.fromfile(fname1, dtype=np.float32).reshape(-1, 4)[:,:3]
 
         # use ICP to refine the ground_truth pose, for ICP we don't voxllize the point clouds
         key = '%d_%d_%d' % (drive, t0, t1)
@@ -142,34 +122,14 @@ class KITTIDataset(Dataset):
         else:
             M2 = self.kitti_icp_cache[key]
 
-
-        # refined pose is denoted as trans
+        # refined pose is denoted as tsfm
         tsfm = M2
         rot = tsfm[:3,:3]
         trans = tsfm[:3,3][:,None]
 
-        # voxelize the point clouds here
-        pcd0 = to_o3d_pcd(xyz0)
-        pcd1 = to_o3d_pcd(xyz1)
-        pcd0 = pcd0.voxel_down_sample(self.voxel_size)
-        pcd1 = pcd1.voxel_down_sample(self.voxel_size)
-        src_pcd = np.array(pcd0.points)
-        tgt_pcd = np.array(pcd1.points)
-
-        # Get matches
-        matching_inds = get_correspondences(pcd0, pcd1, tsfm, self.matching_search_voxel_size)
-        if(matching_inds.size(0) < self.max_corr and self.split == 'train'):
-            return self.__getitem__(np.random.choice(len(self.files),1)[0])
-
-        src_feats=np.ones_like(src_pcd[:,:1]).astype(np.float32)
-        tgt_feats=np.ones_like(tgt_pcd[:,:1]).astype(np.float32)
-
-        rot = rot.astype(np.float32)
-        trans = trans.astype(np.float32)
-
         # add data augmentation
-        src_pcd_input = copy.deepcopy(src_pcd)
-        tgt_pcd_input = copy.deepcopy(tgt_pcd)
+        src_pcd_input = copy.deepcopy(xyz0)
+        tgt_pcd_input = copy.deepcopy(xyz1)
         if(self.data_augmentation):
             # add gaussian noise
             src_pcd_input += (np.random.rand(src_pcd_input.shape[0],3) - 0.5) * self.augment_noise
@@ -194,9 +154,29 @@ class KITTIDataset(Dataset):
 
             src_pcd_input = src_pcd_input + shift_src
             tgt_pcd_input = tgt_pcd_input + shift_tgt
+        else:
+            scale = 1
+
+        # voxel down-sample the point clouds here
+        _, sel_src = ME.utils.sparse_quantize(np.ascontiguousarray(src_pcd_input) / self.voxel_size, return_index=True)
+        _, sel_tgt = ME.utils.sparse_quantize(np.ascontiguousarray(tgt_pcd_input) / self.voxel_size, return_index=True)
+
+        # get correspondence
+        src_xyz, tgt_xyz = src_pcd_input[sel_src], tgt_pcd_input[sel_tgt] # raw point clouds
+        matching_inds = get_correspondences(to_o3d_pcd(src_xyz), to_o3d_pcd(tgt_xyz), tsfm, self.search_voxel_size * scale)
+
+        # get voxelized coordinates
+        src_coords, tgt_coords = np.floor(src_xyz / self.voxel_size), np.floor(tgt_xyz / self.voxel_size)
+
+        # get feats
+        src_feats = np.ones((src_coords.shape[0],1),dtype=np.float32)
+        tgt_feats = np.ones((tgt_coords.shape[0],1),dtype=np.float32)
+
+        src_xyz, tgt_xyz = to_tensor(src_xyz).float(), to_tensor(tgt_xyz).float()
+        rot, trans = to_tensor(rot), to_tensor(trans)
 
 
-        return src_pcd_input, tgt_pcd_input, src_feats, tgt_feats, rot, trans, matching_inds, src_pcd, tgt_pcd, torch.ones(1)
+        return src_xyz, tgt_xyz, src_coords, tgt_coords, src_feats, tgt_feats, matching_inds, rot, trans, scale
 
 
     def apply_transform(self, pts, trans):
