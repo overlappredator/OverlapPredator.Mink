@@ -3,7 +3,7 @@ misc:
   mode: train
   gpu_mode: True
   verbose: True
-  verbose_freq: 200
+  verbose_freq: 180
   snapshot_freq: 1
   pretrain: ''
 
@@ -45,7 +45,7 @@ optimiser:
   scheduler: ExpLR
   scheduler_gamma: 0.99
   scheduler_freq: 1
-  iter_size: 8
+  iter_size: 4
 
 dataset:
   dataset: kitti

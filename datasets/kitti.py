@@ -35,6 +35,7 @@ class KITTIDataset(Dataset):
         self.augment_shift_range = config.augment_shift_range
         self.augment_scale_max = config.augment_scale_max
         self.augment_scale_min = config.augment_scale_min
+        self.max_corr = config.max_points
 
         # Initiate containers
         self.files = []
@@ -140,20 +141,18 @@ class KITTIDataset(Dataset):
             rot_ab= Rotation.from_euler('zyx', euler_ab).as_matrix()
             if(np.random.rand(1)[0]>0.5):
                 src_pcd_input = np.dot(rot_ab, src_pcd_input.T).T
+                rot=np.matmul(rot,rot_ab.T)
             else:
                 tgt_pcd_input = np.dot(rot_ab, tgt_pcd_input.T).T
+                rot=np.matmul(rot_ab,rot)
+                trans=np.matmul(rot_ab,trans)
             
             # scale the pcd
             scale = self.augment_scale_min + (self.augment_scale_max - self.augment_scale_min) * random.random()
             src_pcd_input = src_pcd_input * scale
             tgt_pcd_input = tgt_pcd_input * scale
+            trans = scale * trans
 
-            # shift the pcd
-            shift_src = np.random.uniform(-self.augment_shift_range, self.augment_shift_range, 3)
-            shift_tgt = np.random.uniform(-self.augment_shift_range, self.augment_shift_range, 3)
-
-            src_pcd_input = src_pcd_input + shift_src
-            tgt_pcd_input = tgt_pcd_input + shift_tgt
         else:
             scale = 1
 
@@ -162,8 +161,11 @@ class KITTIDataset(Dataset):
         _, sel_tgt = ME.utils.sparse_quantize(np.ascontiguousarray(tgt_pcd_input) / self.voxel_size, return_index=True)
 
         # get correspondence
+        tsfm = to_tsfm(rot, trans)
         src_xyz, tgt_xyz = src_pcd_input[sel_src], tgt_pcd_input[sel_tgt] # raw point clouds
         matching_inds = get_correspondences(to_o3d_pcd(src_xyz), to_o3d_pcd(tgt_xyz), tsfm, self.search_voxel_size * scale)
+        if(matching_inds.size(0) < self.max_corr and self.split == 'train'):
+            return self.__getitem__(np.random.choice(len(self.files),1)[0])
 
         # get voxelized coordinates
         src_coords, tgt_coords = np.floor(src_xyz / self.voxel_size), np.floor(tgt_xyz / self.voxel_size)

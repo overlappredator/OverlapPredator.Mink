@@ -1,5 +1,5 @@
 ## PREDATOR: Registration of 3D Point Clouds with Low Overlap (CVPR 2021)
-This repository provides implementation of PREDATOR, a  model for **p**airwise point-cloud **re**gistration with **d**eep **at**tention to the **o**verlap **r**egion using sparse convolution backbone. It represents the official implementation of the paper:
+This repository provides implementation using sparse convolution backbone. It represents the official implementation of the paper:
 
 ### [PREDATOR: Registration of 3D Point Clouds with Low Overlap](https://arxiv.org/abs/2011.13005)
 
@@ -18,6 +18,7 @@ If you have any questions, please let us know:
 - Zan Gojcic {zan.gojcic@geod.baug.ethz.ch}
 
 ### News
+- 2021-03-12: pre-trained model release
 - 2021-02-28: codebase release
 
 
@@ -34,6 +35,7 @@ cd OverlapPredator.Mink; pip install -r requirements.txt
 ```
 in your working folder.
 If you come across problem when installing ```MinkowskiEngine```, please have a look [here](https://github.com/NVIDIA/MinkowskiEngine)
+
 
 
 ### Train on 3DMatch(Indoor)
@@ -65,4 +67,4 @@ In this project we use (parts of) the official implementations of the followin w
 - [DGCNN](https://github.com/WangYueFt/dgcnn) (self-gnn)
 - [RPMNet](https://github.com/yewzijian/RPMNet) (ModelNet preprocessing and evaluation)
 
- We thank the respective authors for open sourcing their methods.
+ We thank the respective authors for open sourcing their methods. We would also like to thank Reviewer 2 for valuable inputs.
