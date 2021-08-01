@@ -1,11 +1,11 @@
 misc:
-  exp_dir: indoor
+  exp_dir: indoor_fix_train_in_summer
   mode: train
   gpu_mode: True
   verbose: True
   verbose_freq: 500
   snapshot_freq: 1
-  pretrain: ''
+  pretrain: snapshot/indoor_fix_train_in_summer/checkpoints/model_best_recall.pth
 
 
 model:
@@ -37,8 +37,8 @@ loss:
 
 optimiser:
   optimizer: SGD
-  max_epoch: 200
-  lr: 0.1
+  max_epoch: 100
+  lr: 0.05
   momentum: 0.8
   weight_decay: 0.0001
   bn_momentum: 0.05
@@ -49,7 +49,7 @@ optimiser:
 
 dataset:
   dataset: indoor
-  benchmark: 3DMatch
+  benchmark: 3DLoMatch
   root: data/indoor
   voxel_size: 0.025
   batch_size: 1 

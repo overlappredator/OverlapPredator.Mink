@@ -107,7 +107,7 @@ if __name__=='__main__':
     parser.add_argument(
         '--benchmark', default='3DLoMatch', type=str, help='[3DMatch, 3DLoMatch]')
     parser.add_argument(
-        '--n_points', default=1000, type=int, help='number of points used by RANSAC')
+        '--n_points', default=5000, type=int, help='number of points used by RANSAC')
     parser.add_argument(
         '--exp_dir', default='est_traj', type=str, help='export final results')
     args = parser.parse_args()

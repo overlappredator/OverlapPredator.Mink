@@ -1,11 +1,11 @@
 misc:
-  exp_dir: indoor
+  exp_dir: indoor_fix_test
   mode: test
   gpu_mode: True
   verbose: True
   verbose_freq: 500
   snapshot_freq: 1
-  pretrain: 'snapshot/indoor/checkpoints/model_best_loss.pth'
+  pretrain: snapshot/indoor_fix_train_in_summer/checkpoints/model_best_recall.pth
 
 
 model:
@@ -38,7 +38,7 @@ loss:
 optimiser:
   optimizer: SGD
   max_epoch: 100
-  lr: 0.1
+  lr: 0.05
   momentum: 0.8
   weight_decay: 0.0001
   bn_momentum: 0.05
@@ -62,4 +62,3 @@ demo:
   src_pcd: assets/cloud_bin_21.pth
   tgt_pcd: assets/cloud_bin_34.pth
   n_points: 1000
-
